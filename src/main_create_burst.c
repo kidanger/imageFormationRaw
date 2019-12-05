@@ -37,7 +37,7 @@
 // display help usage
 void print_help(char *name)
 {
-    printf("\nusage:\n\t%s input base number -i interp -b boundary -L L -t type -z zoom -c crop -n sigma -s seed -p psf]  \n", name);
+    printf("\nusage:\n\t%s input base number -i interp -b boundary -L L -t type -z zoom -c crop -n sigma -s seed -p psf -e expo]  \n", name);
     
     printf("\n");
     printf("\t Output images are written as base_%%i.tiff\n");
@@ -49,6 +49,7 @@ void print_help(char *name)
     printf("\t type is the type of transformation (2 translation, 3 euclidean, 6 affinity, 8 homography, 'horizontal')\n");
     printf("\t zoom corresponds to the down-sampling factor\n");
     printf("\t psf controls the subsampling type: set to 1 to integrate\n");
+    printf("\t expo controls the exposure time cycle values\n");
 }
 
 enum Type {
@@ -62,7 +63,8 @@ enum Type {
 // read command line parameters
 static int read_parameters(int argc, char *argv[], char **infile, char **outfile,
                            int *n, char **interp, char **boundary, double *L, int *type,
-                           double *zoom, int *crop, double *sigma, unsigned long *seed, int *psf)
+                           double *zoom, int *crop, double *sigma, unsigned long *seed, int *psf,
+                           double **exposures, int *nexposures)
 {
     // display usage
     if (argc < 4) {
@@ -87,6 +89,8 @@ help:
         *crop      = PAR_DEFAULT_CROP;
         *seed      = PAR_DEFAULT_SEED;
         *psf       = PAR_DEFAULT_PSF;
+        *exposures = NULL;
+        *nexposures = 0;
         
         //read each parameter from the command line
         while(i < argc) {
@@ -127,6 +131,19 @@ help:
                 if(i < argc-1)
                     *psf = atoi(argv[++i]);
 
+            if(strcmp(argv[i],"-e")==0)
+                if(i < argc-1) {
+                    char* arg = strdup(argv[++i]);
+                    char* t = strtok(arg, ",");
+                    while (t) {
+                        (*nexposures)++;
+                        *exposures = realloc(*exposures, *nexposures*sizeof(float*));
+                        (*exposures)[(*nexposures)-1] = atof(t);
+                        t = strtok(0, ",");
+                    }
+                    free(arg);
+                }
+
             i++;
         }
         
@@ -162,9 +179,11 @@ int main(int c, char *v[])
     int n, type, crop, psf;
     unsigned long seed;
     double L, zoom, sigma;
+    double* exposures;
+    int nexposures;
     
     int result = read_parameters(c, v, &filename_in, &base_out, &n, &interp, &boundary,
-        &L, &type, &zoom, &crop, &sigma, &seed, &psf);
+        &L, &type, &zoom, &crop, &sigma, &seed, &psf, &exposures, &nexposures);
 
     if ( result ) {
         // initialize FFTW
@@ -265,6 +284,14 @@ int main(int c, char *v[])
             }
             else
                 memcpy(out, out_resampling, wout*hout*pd*sizeof*out_resampling);
+
+            // vary exposure time
+            if (nexposures > 0) {
+                double expo = exposures[j % nexposures];
+                printf("%g\n", expo);
+                for(int i = 0; i < wout*hout*pd; i++)
+                    out[i] *= expo;
+            }
             
             // add noise
             if ( sigma > 0 )
