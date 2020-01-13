@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -march=native")
+
 # Enable C99
 if(CMAKE_VERSION VERSION_LESS "3.1")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
